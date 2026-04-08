@@ -23,63 +23,53 @@ def get_icon(code):
 @app.route("/")
 def home():
 
-    # 🌧️ Radar (RainViewer)
+    # 🌧️ Radar
     try:
         url = "https://api.rainviewer.com/public/weather-maps.json"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-
+        data = requests.get(url, timeout=10).json()
         radar = data["radar"]["past"][-1]["path"]
         radar_url = f"https://tilecache.rainviewer.com{radar}/256/{{z}}/{{x}}/{{y}}/2/1_1.png"
-    except Exception as e:
-        print("Erro radar:", e)
+    except:
         radar_url = ""
 
-    # 🌡️ Clima atual (CORRIGIDO)
+    # 🌡️ Clima
     try:
         weather_api = "https://api.open-meteo.com/v1/forecast?latitude=-23.42&longitude=-51.42&current_weather=true"
-        response = requests.get(weather_api, timeout=10)
+        r = requests.get(weather_api, timeout=10)
 
-        if response.status_code == 200:
-            w = response.json()
-            current = w.get("current_weather", {})
-
-            temp = current.get("temperature", "--")
-            wind = current.get("windspeed", "--")
-            code = current.get("weathercode", 0)
+        if r.status_code == 200:
+            w = r.json()
+            c = w.get("current_weather", {})
+            temp = c.get("temperature", "--")
+            wind = c.get("windspeed", "--")
+            code = c.get("weathercode", 0)
             icon = get_icon(code)
         else:
-            temp = "--"
-            wind = "--"
-            code = "--"
-            icon = "🌡️"
+            temp, wind, icon = "--", "--", "🌡️"
 
-    except Exception as e:
-        print("Erro clima:", e)
-        temp = "--"
-        wind = "--"
-        code = "--"
-        icon = "🌡️"
+    except:
+        temp, wind, icon = "--", "--", "🌡️"
 
     # 📰 Notícias
     try:
-        rss_url = "https://news.google.com/rss/search?q=meteorologia+chuva+Brasil&hl=pt-BR&gl=BR&ceid=BR:pt-419"
-        feed = feedparser.parse(rss_url)
+        rss = "https://news.google.com/rss/search?q=meteorologia+Brasil&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+        feed = feedparser.parse(rss)
 
         news = []
         for e in feed.entries[:5]:
             news.append(f"<a href='{e.link}' target='_blank'>{e.title}</a>")
 
-        news_html = "<br><br>".join(news) if news else "Sem notícias"
-    except Exception as e:
-        print("Erro notícias:", e)
-        news_html = "Erro ao carregar notícias"
+        news_html = "<br><br>".join(news)
+    except:
+        news_html = "Erro ao carregar"
 
     html = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Radar Meteorológico</title>
+        <title>Radar do Pedro</title>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -91,18 +81,31 @@ def home():
                 display: flex;
                 background: #0f172a;
                 color: white;
+                transition: 0.3s;
+            }}
+
+            body.mobile {{
+                flex-direction: column;
             }}
 
             #sidebar {{
                 width: 300px;
                 background: #111827;
                 padding: 15px;
-                overflow-y: auto;
+            }}
+
+            body.mobile #sidebar {{
+                width: 100%;
+                height: 40%;
             }}
 
             #map {{
                 flex: 1;
                 height: 100vh;
+            }}
+
+            body.mobile #map {{
+                height: 60vh;
             }}
 
             .card {{
@@ -112,10 +115,14 @@ def home():
                 margin-bottom: 10px;
             }}
 
-            a {{
-                color: #60a5fa;
-                text-decoration: none;
-                font-size: 13px;
+            button {{
+                padding: 10px;
+                border: none;
+                border-radius: 8px;
+                background: #2563eb;
+                color: white;
+                cursor: pointer;
+                margin-bottom: 10px;
             }}
         </style>
     </head>
@@ -123,12 +130,14 @@ def home():
     <body>
 
         <div id="sidebar">
+            <button onclick="toggleMobile()">📱 Modo Mobile</button>
+
             <h2>🌍 Radar</h2>
 
             <div class="card">
-                <b>Clima atual</b><br><br>
+                <b>Clima</b><br><br>
                 {icon} {temp}°C<br>
-                🌬️ {wind} km/h<br>
+                🌬️ {wind} km/h
             </div>
 
             <div class="card">
@@ -140,11 +149,15 @@ def home():
         <div id="map"></div>
 
         <script>
+            function toggleMobile() {{
+                document.body.classList.toggle("mobile");
+            }}
+
             var map = L.map('map').setView([-23.42, -51.42], 6);
 
             var base = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png').addTo(map);
 
-            {"var radar = L.tileLayer('" + radar_url + "', {opacity: 0.6}).addTo(map);" if radar_url else ""}
+            {"L.tileLayer('" + radar_url + "', {opacity: 0.6}).addTo(map);" if radar_url else ""}
 
             map.setMinZoom(5);
             map.setMaxZoom(14);
@@ -157,6 +170,5 @@ def home():
     return render_template_string(html)
 
 
-# 🔥 ESSENCIAL PRO RENDER
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
