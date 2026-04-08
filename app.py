@@ -26,22 +26,36 @@ def home():
     # 🌧️ Radar (RainViewer)
     try:
         url = "https://api.rainviewer.com/public/weather-maps.json"
-        data = requests.get(url, timeout=5).json()
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
         radar = data["radar"]["past"][-1]["path"]
         radar_url = f"https://tilecache.rainviewer.com{radar}/256/{{z}}/{{x}}/{{y}}/2/1_1.png"
-    except:
+    except Exception as e:
+        print("Erro radar:", e)
         radar_url = ""
 
-    # 🌡️ Clima atual
+    # 🌡️ Clima atual (CORRIGIDO)
     try:
         weather_api = "https://api.open-meteo.com/v1/forecast?latitude=-23.42&longitude=-51.42&current_weather=true"
-        w = requests.get(weather_api, timeout=5).json()
+        response = requests.get(weather_api, timeout=10)
 
-        temp = w["current_weather"]["temperature"]
-        wind = w["current_weather"]["windspeed"]
-        code = w["current_weather"]["weathercode"]
-        icon = get_icon(code)
-    except:
+        if response.status_code == 200:
+            w = response.json()
+            current = w.get("current_weather", {})
+
+            temp = current.get("temperature", "--")
+            wind = current.get("windspeed", "--")
+            code = current.get("weathercode", 0)
+            icon = get_icon(code)
+        else:
+            temp = "--"
+            wind = "--"
+            code = "--"
+            icon = "🌡️"
+
+    except Exception as e:
+        print("Erro clima:", e)
         temp = "--"
         wind = "--"
         code = "--"
@@ -57,7 +71,8 @@ def home():
             news.append(f"<a href='{e.link}' target='_blank'>{e.title}</a>")
 
         news_html = "<br><br>".join(news) if news else "Sem notícias"
-    except:
+    except Exception as e:
+        print("Erro notícias:", e)
         news_html = "Erro ao carregar notícias"
 
     html = f"""
@@ -114,7 +129,6 @@ def home():
                 <b>Clima atual</b><br><br>
                 {icon} {temp}°C<br>
                 🌬️ {wind} km/h<br>
-                Código: {code}
             </div>
 
             <div class="card">
